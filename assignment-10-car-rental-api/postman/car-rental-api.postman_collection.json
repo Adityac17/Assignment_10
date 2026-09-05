@@ -1,0 +1,261 @@
+{
+  "info": {
+    "name": "Car Rental & Fleet Booking System API",
+    "_postman_id": "a10-car-rental-collection",
+    "description": "End-to-end flow: register, login, create vehicle, book a vehicle, attempt a colliding booking (expects 400), cancel, complete, and list my bookings.\n\nVariables used:\n- baseUrl (default http://localhost:3000)\n- access_token (auto-set by the Login request test script)\n- vehicle_id (auto-set by Create Vehicle)\n- rental_id (auto-set by Book Vehicle)\n- rental_id_2 (auto-set by Book Vehicle #2 for the complete step)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "access_token", "value": "" },
+    { "key": "vehicle_id", "value": "" },
+    { "key": "rental_id", "value": "" },
+    { "key": "rental_id_2", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Ada Lovelace\",\n  \"email\": \"ada+{{$timestamp}}@example.com\",\n  \"password\": \"StrongPassw0rd!\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 or 400 (duplicate)', function () {",
+              "  pm.expect([201, 400]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"REPLACE_WITH_A_REGISTERED_EMAIL@example.com\",\n  \"password\": \"StrongPassw0rd!\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('login ok', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "if (json && json.data && json.data.access_token) {",
+              "  pm.collectionVariables.set('access_token', json.data.access_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create Vehicle",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/vehicles", "host": ["{{baseUrl}}"], "path": ["api", "vehicles"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand\": \"Tesla\",\n  \"model\": \"Model 3\",\n  \"year\": 2024,\n  \"category\": \"Electric\",\n  \"daily_rate\": 75.00,\n  \"fuel_type\": \"Electric\",\n  \"seating_capacity\": 5\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('vehicle created', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "if (json && json.data && json.data.id) {",
+              "  pm.collectionVariables.set('vehicle_id', json.data.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. List Vehicles (public, filterable)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/vehicles?category=Electric&status=available",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "vehicles"],
+          "query": [
+            { "key": "category", "value": "Electric" },
+            { "key": "status", "value": "available" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. Get Vehicle by id (includes rentals)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/vehicles/{{vehicle_id}}", "host": ["{{baseUrl}}"], "path": ["api", "vehicles", "{{vehicle_id}}"] }
+      }
+    },
+    {
+      "name": "6. Book Vehicle (2026-05-01 to 2026-05-05)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/rentals", "host": ["{{baseUrl}}"], "path": ["api", "rentals"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vehicle_id\": {{vehicle_id}},\n  \"start_date\": \"2026-05-01\",\n  \"end_date\": \"2026-05-05\",\n  \"customer_name\": \"Ada Lovelace\",\n  \"customer_email\": \"ada@example.com\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('booking created', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "if (json && json.data && json.data.id) {",
+              "  pm.collectionVariables.set('rental_id', json.data.id);",
+              "}",
+              "pm.test('total_cost computed server-side (4 days * 75 = 300)', function () {",
+              "  pm.expect(Number(json.data.total_cost)).to.eql(300);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Colliding Booking (2026-05-03 to 2026-05-07) EXPECT 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/rentals", "host": ["{{baseUrl}}"], "path": ["api", "rentals"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vehicle_id\": {{vehicle_id}},\n  \"start_date\": \"2026-05-03\",\n  \"end_date\": \"2026-05-07\",\n  \"customer_name\": \"Grace Hopper\",\n  \"customer_email\": \"grace@example.com\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('collision returns 400', function () { pm.response.to.have.status(400); });",
+              "pm.test('collision message', function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.message).to.eql('Vehicle already reserved during this timeframe');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Book Vehicle #2 (future, to complete later)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/rentals", "host": ["{{baseUrl}}"], "path": ["api", "rentals"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vehicle_id\": {{vehicle_id}},\n  \"start_date\": \"2026-09-01\",\n  \"end_date\": \"2026-09-03\",\n  \"customer_name\": \"Ada Lovelace\",\n  \"customer_email\": \"ada@example.com\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json && json.data && json.data.id) {",
+              "  pm.collectionVariables.set('rental_id_2', json.data.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Cancel Booking",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/rentals/{{rental_id}}/cancel", "host": ["{{baseUrl}}"], "path": ["api", "rentals", "{{rental_id}}", "cancel"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('cancel ok', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Complete Booking",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/rentals/{{rental_id_2}}/complete", "host": ["{{baseUrl}}"], "path": ["api", "rentals", "{{rental_id_2}}", "complete"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('complete ok', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. My Bookings",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/rentals/my-bookings", "host": ["{{baseUrl}}"], "path": ["api", "rentals", "my-bookings"] }
+      }
+    }
+  ]
+}
